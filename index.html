@@ -217,10 +217,11 @@
   <div id="drawerOverlay" style="position:fixed; inset:0; background:rgba(31,41,55,0.18); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); opacity:0; pointer-events:none; transition:opacity 0.22s ease; z-index:998;"></div>
 
   <div id="sideDrawer" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.96); width:min(640px, 92vw); max-height:82vh; background:var(--bg); border:1px solid var(--line); box-shadow:0 24px 60px rgba(0,0,0,0.25); border-radius:18px; transition:opacity 0.22s ease, transform 0.22s ease; z-index:999; overflow-y:auto; padding:22px; opacity:0; pointer-events:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <h1 style="font-size:18px;">Configuración</h1>
       <button id="drawerCloseBtn" aria-label="Cerrar menú" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--ink-soft);">✕</button>
     </div>
+    <button id="changeConnectionBtn" style="background:transparent; border:none; color:var(--ink-soft); font-size:11px; text-decoration:underline; cursor:pointer; padding:0; margin-bottom:18px;">Cambiar conexión de Google Sheets</button>
 
     <section style="margin-bottom:20px;">
       <h2 id="categoriesToggle" style="cursor:pointer; user-select:none;">
@@ -574,10 +575,15 @@ function setCategoryFilter(cat){
 }
 
 function getScriptUrl(){
-  // Guardado en un archivo de config simple: se pide una vez y se recuerda
-  // usando un parámetro en la URL de la página (?api=...) o el campo manual.
+  // Prioridad: 1) parámetro ?api= en la URL, 2) guardado en este navegador (localStorage), 3) campo manual
   const params = new URLSearchParams(window.location.search);
-  return params.get('api') || SCRIPT_URL || '';
+  const desdeUrl = params.get('api');
+  if(desdeUrl) return desdeUrl;
+  try{
+    const guardada = localStorage.getItem('mis-cuentas-script-url');
+    if(guardada) return guardada;
+  }catch(e){}
+  return SCRIPT_URL || '';
 }
 
 const CATEGORIAS_DEFAULT_LOCAL = [
@@ -1729,10 +1735,24 @@ document.getElementById('clearAllBtn').addEventListener('click', () => {
   alert('Para borrar movimientos, hazlo directamente en tu Google Sheet (borra la fila) — así siempre tienes control total sobre tus datos.');
 });
 
+document.getElementById('changeConnectionBtn').addEventListener('click', () => {
+  if(!confirm('¿Cambiar la conexión de Google Sheets? Vas a tener que pegar la URL de tu Apps Script de nuevo.')) return;
+  try{ localStorage.removeItem('mis-cuentas-script-url'); }catch(e){}
+  const url = new URL(window.location.href);
+  url.searchParams.delete('api');
+  window.history.replaceState({}, '', url);
+  SCRIPT_URL = '';
+  cerrarDrawer();
+  document.getElementById('configCard').style.display = 'block';
+  document.getElementById('scriptUrlInput').value = '';
+  document.getElementById('scriptUrlInput').focus();
+});
+
 document.getElementById('saveUrlBtn').addEventListener('click', () => {
   const val = document.getElementById('scriptUrlInput').value.trim();
   if(!val){ setStatus('Pega la URL de tu Apps Script.', true); return; }
   SCRIPT_URL = val;
+  try{ localStorage.setItem('mis-cuentas-script-url', val); }catch(e){}
   // Actualiza la URL del navegador para que quede guardada como marcador (?api=...)
   const url = new URL(window.location.href);
   url.searchParams.set('api', val);
